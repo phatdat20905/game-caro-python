@@ -1,0 +1,15 @@
+# Python Game Caro - Dependencies
+
+# GUI & Graphics
+pillow>=10.0.0
+
+# Audio
+pygame>=2.5.0
+
+# Threading & Async (built-in, listed for reference)
+# threading
+# socket
+# sqlite3
+
+# Utils
+python-dateutil>=2.8.0
