@@ -125,7 +125,7 @@ class FindRoomFrm:
         self.window.wait_window()
     
     def close(self):
-        """Close window"""
+        """Close window - Java pattern: ONLY dispose, caller decides what to open next"""
         try:
             self.window.destroy()
         except:

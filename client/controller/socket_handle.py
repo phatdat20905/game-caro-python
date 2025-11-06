@@ -216,6 +216,13 @@ class SocketHandle(threading.Thread):
             elif command == PROTOCOL_NEW_GAME:
                 self.handle_new_game()
             
+            # CRITICAL FIX: Add WIN/LOSE handlers
+            elif command == PROTOCOL_WIN:
+                self.handle_win()
+            
+            elif command == PROTOCOL_LOSE:
+                self.handle_lose()
+            
             elif command == PROTOCOL_DRAW_REQUEST:
                 self.handle_draw_request()
             
@@ -395,6 +402,16 @@ class SocketHandle(threading.Thread):
         """Handle draw game"""
         if hasattr(self.client, 'on_draw_game'):
             self.client.on_draw_game()
+    
+    def handle_win(self):
+        """Handle win from server - CRITICAL FIX"""
+        if hasattr(self.client, 'on_win'):
+            self.client.on_win()
+    
+    def handle_lose(self):
+        """Handle lose from server - CRITICAL FIX"""
+        if hasattr(self.client, 'on_lose'):
+            self.client.on_lose()
     
     def handle_competitor_time_out(self):
         """Handle competitor timeout"""

@@ -347,6 +347,18 @@ class Client:
         cls.open_homepage()
     
     @classmethod
+    def on_win(cls):
+        """Handle win notification from server - CRITICAL FIX"""
+        if cls.game_client_frm:
+            cls.game_client_frm.on_game_win()
+    
+    @classmethod
+    def on_lose(cls):
+        """Handle lose notification from server - CRITICAL FIX"""
+        if cls.game_client_frm:
+            cls.game_client_frm.on_game_loss()
+    
+    @classmethod
     def on_admin_broadcast(cls, message):
         """Handle admin broadcast message"""
         # Add to homepage chat if it exists
