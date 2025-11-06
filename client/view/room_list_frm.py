@@ -158,7 +158,8 @@ class RoomListFrm:
                 
                 # Get password status
                 password = passwords[i] if i < len(passwords) else " "
-                has_password = password != " "
+                # Public room: password is " " (single space) or empty
+                has_password = password.strip() != ""
                 password_status = "Có mật khẩu" if has_password else "Công khai"
                 
                 # Insert into table
@@ -305,7 +306,7 @@ class RoomListFrm:
         self.window.deiconify()
     
     def close(self):
-        """Close window - Java pattern: ONLY dispose, caller decides what to open next"""
+        """Close window"""
         try:
             self.window.destroy()
         except:

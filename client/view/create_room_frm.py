@@ -201,7 +201,7 @@ class CreateRoomFrm:
         self.window.deiconify()
     
     def close(self):
-        """Close window - Java pattern: ONLY dispose, caller decides what to open next"""
+        """Close window"""
         try:
             self.window.destroy()
         except:

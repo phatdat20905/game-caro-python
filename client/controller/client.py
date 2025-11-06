@@ -48,7 +48,20 @@ class Client:
     
     @classmethod
     def open_homepage(cls):
-        """Open homepage"""
+        """Open homepage - reuse existing if available"""
+        # Check if homepage already exists and is valid
+        if cls.homepage_frm and hasattr(cls.homepage_frm, 'window'):
+            try:
+                # Try to show existing window
+                cls.homepage_frm.window.deiconify()
+                cls.homepage_frm.window.lift()
+                cls.homepage_frm.window.focus_force()
+                return
+            except:
+                # Window was destroyed, create new
+                pass
+        
+        # Create new homepage
         from client.view.homepage_frm import HomePageFrm
         cls.homepage_frm = HomePageFrm()
         cls.homepage_frm.show()
@@ -345,18 +358,6 @@ class Client:
             cls.game_client_frm.close()
         messagebox.showinfo("Thông báo", "Đối thủ đã rời khỏi phòng!")
         cls.open_homepage()
-    
-    @classmethod
-    def on_win(cls):
-        """Handle win notification from server - CRITICAL FIX"""
-        if cls.game_client_frm:
-            cls.game_client_frm.on_game_win()
-    
-    @classmethod
-    def on_lose(cls):
-        """Handle lose notification from server - CRITICAL FIX"""
-        if cls.game_client_frm:
-            cls.game_client_frm.on_game_loss()
     
     @classmethod
     def on_admin_broadcast(cls, message):

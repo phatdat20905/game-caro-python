@@ -235,31 +235,13 @@ class HomePageFrm:
             self.close()
     
     def create_room(self):
-        """Create room - Java pattern: ask for password, then close homepage"""
-        # Ask if user wants to set password
-        result = messagebox.askyesno(
-            "Tạo phòng",
-            "Bạn có muốn đặt mật khẩu cho phòng không?"
-        )
-        
-        if result:  # YES - wants password
-            self.close()
-            Client.open_create_room_password()
-        else:  # NO - public room
-            try:
-                Client.socket_handle.write(create_message(PROTOCOL_CREATE_ROOM))
-                self.close()  # Close homepage, waiting room will open when server responds
-            except Exception as e:
-                messagebox.showerror("Lỗi", f"Không thể tạo phòng: {str(e)}")
+        """Create room"""
+        Client.open_create_room()
     
     def room_list(self):
-        """Show room list - Java pattern: close homepage, open room list, send protocol"""
-        try:
-            self.close()
-            Client.open_room_list()
-            Client.socket_handle.write(create_message(PROTOCOL_VIEW_ROOM_LIST))
-        except Exception as e:
-            messagebox.showerror("Lỗi", f"Không thể xem danh sách phòng: {str(e)}")
+        """Show room list"""
+        self.close()
+        Client.open_room_list()
     
     def friend_list(self):
         """Show friend list"""
@@ -283,26 +265,8 @@ class HomePageFrm:
             Client.open_login()
     
     def on_closing(self):
-        """Handle window closing - CRITICAL FIX"""
-        if messagebox.askokcancel("Thoát", "Bạn có chắc muốn đăng xuất và thoát?"):
-            # Logout first
-            try:
-                if Client.socket_handle:
-                    Client.socket_handle.write("logout,")
-                    Client.socket_handle.close()
-            except:
-                pass
-            
-            # Destroy all windows
-            try:
-                if hasattr(Client, 'root') and Client.root:
-                    Client.root.destroy()
-            except:
-                pass
-            
-            # Force exit
-            import sys
-            sys.exit(0)
+        """Handle window closing"""
+        self.logout()
     
     def show(self):
         """Show window"""

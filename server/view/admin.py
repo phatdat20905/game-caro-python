@@ -25,8 +25,6 @@ class Admin:
         self.root.title("Caro Game - Admin Panel")
         self.root.geometry("800x600")
         self.root.resizable(True, True)
-        
-        # CRITICAL FIX: Bind window close event
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
         self.setup_ui()
@@ -417,23 +415,22 @@ class Admin:
             self.root.quit()
     
     def on_closing(self):
-        """Handle admin panel close - CRITICAL FIX"""
-        if messagebox.askokcancel("Dừng Server", "Bạn có chắc muốn dừng server?"):
-            # Stop server first
-            try:
-                self.add_message("Stopping server...")
-                if hasattr(self.server, 'stop'):
+        """Handle window closing - stop server and exit"""
+        if messagebox.askyesno("Confirm Exit", "Stop server and close admin panel?"):
+            self.add_message("Shutting down server...")
+            
+            # Stop server
+            if hasattr(self.server, 'stop'):
+                try:
                     self.server.stop()
-            except:
-                pass
+                except:
+                    pass
             
-            # Destroy window
-            try:
-                self.root.destroy()
-            except:
-                pass
+            # Quit and destroy
+            self.root.quit()
+            self.root.destroy()
             
-            # Force exit
+            # Exit process
             import sys
             sys.exit(0)
     

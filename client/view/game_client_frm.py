@@ -47,10 +47,9 @@ class GameClientFrm:
         self.board = [[0 for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
         self.buttons = [[None for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
         
-        # Timer - CRITICAL FIX: Track timer_id to prevent double-running
+        # Timer
         self.time_left = TURN_TIME_LIMIT
         self.timer_running = False
-        self.timer_id = None  # NEW: Track after() callback ID
         
         # AI mode
         self.is_ai_mode = (competitor.get_nickname() == "AI")
@@ -58,8 +57,8 @@ class GameClientFrm:
         self.setup_ui()
         self.center_window()
         
-        # DON'T start timer in __init__ - wait for show() or explicit call
-        # This prevents double-start issue
+        # DON'T start timer here - let show() handle it
+        # This prevents double start_timer() calls
     
     def center_window(self):
         """Center window on screen"""
@@ -269,7 +268,7 @@ class GameClientFrm:
         
         # Check win
         if GameLogic.check_win(self.board, row, col, 1):
-            self.on_game_win()
+            self.on_game_win(row, col)
             return
         
         # Check draw
@@ -432,71 +431,41 @@ class GameClientFrm:
             self.update_status("Lượt đối thủ...")
     
     def start_timer(self):
-        """Start turn timer - CRITICAL FIX for double-start prevention"""
-        # STEP 1: Cancel any existing timer callback first
-        if self.timer_id is not None:
-            try:
-                self.window.after_cancel(self.timer_id)
-                log(f"[TIMER] Cancelled existing timer callback ID={self.timer_id}", "DEBUG")
-            except:
-                pass
-            self.timer_id = None
+        """Start turn timer"""
+        # CRITICAL: Stop any existing timer first to prevent double-running
+        log(f"[TIMER] start_timer called, current timer_running={self.timer_running}", "DEBUG")
+        self.stop_timer()
         
-        # STEP 2: Check if timer already running (防止 double start)
-        if self.timer_running:
-            log(f"[TIMER] WARNING: Timer already running! Ignoring start request.", "WARNING")
-            return
-        
-        # STEP 3: Initialize new timer
         self.time_left = TURN_TIME_LIMIT
         self.timer_running = True
-        log(f"[TIMER] Starting NEW timer with {self.time_left}s", "DEBUG")
-        
-        # STEP 4: Start timer loop
+        log(f"[TIMER] Starting new timer with time_left={self.time_left}", "DEBUG")
         self.update_timer()
     
     def stop_timer(self):
-        """Stop timer - CRITICAL FIX"""
+        """Stop turn timer"""
         if self.timer_running:
-            log(f"[TIMER] Stopping timer at {self.time_left}s", "DEBUG")
-        
-        # Cancel pending callback
-        if self.timer_id is not None:
-            try:
-                self.window.after_cancel(self.timer_id)
-                log(f"[TIMER] Cancelled timer callback ID={self.timer_id}", "DEBUG")
-            except:
-                pass
-            self.timer_id = None
-        
+            log(f"[TIMER] Stopping timer", "DEBUG")
         self.timer_running = False
-        self.time_left = TURN_TIME_LIMIT
     
     def update_timer(self):
-        """Update timer display - called every 1 second - CRITICAL FIX"""
-        # Check if timer should stop
+        """Update timer display - called every 1 second"""
         if not self.timer_running:
-            log(f"[TIMER] Timer stopped, exiting update loop", "DEBUG")
-            self.timer_id = None
+            log(f"[TIMER] update_timer called but timer_running=False, returning", "DEBUG")
             return
         
         # Update display
         self.timer_label.config(text=f"⏱ {self.time_left}s")
-        log(f"[TIMER] Tick: {self.time_left}s remaining", "DEBUG")
+        log(f"[TIMER] Timer tick: time_left={self.time_left}", "DEBUG")
         
         # Check timeout
         if self.time_left <= 0:
-            log(f"[TIMER] Timeout!", "DEBUG")
-            self.timer_running = False
-            self.timer_id = None
+            log(f"[TIMER] Timeout reached!", "DEBUG")
             self.on_timeout()
-            return  # CRITICAL: Don't schedule next callback
+            return  # IMPORTANT: Don't schedule next update
         
-        # Decrement time
+        # Decrement and schedule next update
         self.time_left -= 1
-        
-        # Schedule next update - CRITICAL: Save callback ID
-        self.timer_id = self.window.after(1000, self.update_timer)
+        self.window.after(1000, self.update_timer)  # Schedule only once!
     
     def on_timeout(self):
         """Handle timeout"""
@@ -514,17 +483,25 @@ class GameClientFrm:
         """Update status label"""
         self.status_label.config(text=status)
     
-    def on_game_win(self):
+    def on_game_win(self, row=None, col=None):
         """Handle game win"""
         self.game_ended = True
         self.stop_timer()
         self.draw_button.config(state=tk.DISABLED)
         
-        messagebox.showinfo("Chiến thắng!", "🎉 Chúc mừng! Bạn đã thắng!")
+        # Force window to front before showing messagebox
+        self.window.lift()
+        self.window.focus_force()
+        messagebox.showinfo("Chiến thắng!", "🎉 Chúc mừng! Bạn đã thắng!", parent=self.window)
         
-        # Send win to server (if not AI mode)
+        # Send win to server with last move position (if not AI mode)
         if not self.is_ai_mode and Client.socket_handle:
-            Client.socket_handle.write(create_message(PROTOCOL_WIN))
+            if row is not None and col is not None:
+                # Send with position (Java: "win," + x + "," + y)
+                Client.socket_handle.write(create_message(PROTOCOL_WIN, row, col))
+            else:
+                # Fallback without position
+                Client.socket_handle.write(create_message(PROTOCOL_WIN))
     
     def on_game_loss(self):
         """Handle game loss"""
@@ -532,7 +509,10 @@ class GameClientFrm:
         self.stop_timer()
         self.draw_button.config(state=tk.DISABLED)
         
-        messagebox.showinfo("Thua cuộc", "😢 Bạn đã thua!")
+        # Force window to front before showing messagebox
+        self.window.lift()
+        self.window.focus_force()
+        messagebox.showinfo("Thua cuộc", "😢 Bạn đã thua!", parent=self.window)
     
     def on_game_draw(self):
         """Handle game draw"""
@@ -540,7 +520,25 @@ class GameClientFrm:
         self.stop_timer()
         self.draw_button.config(state=tk.DISABLED)
         
-        messagebox.showinfo("Hòa", "🤝 Trò chơi hòa!")
+        # Force window to front before showing messagebox
+        self.window.lift()
+        self.window.focus_force()
+        messagebox.showinfo("Hòa", "🤝 Trò chơi hòa!", parent=self.window)
+    
+    def handle_competitor_timeout(self):
+        """
+        Handle competitor timeout - means I WIN!
+        This is called when server sends PROTOCOL_COMPETITOR_TIME_OUT
+        Matches Java's competitorTimeOut() behavior
+        """
+        self.game_ended = True
+        self.stop_timer()
+        self.draw_button.config(state=tk.DISABLED)
+        
+        # Show win message (because opponent timed out or resigned)
+        self.window.lift()
+        self.window.focus_force()
+        messagebox.showinfo("Chiến thắng!", "🎉 Đối thủ đã hết thời gian! Bạn thắng!", parent=self.window)
     
     def new_game(self):
         """
@@ -584,55 +582,34 @@ class GameClientFrm:
             self.update_status("Lượt đối thủ...")
     
     def request_draw(self):
-        """Request draw with opponent - IMPROVED UX"""
-        # Validation
-        if not self.my_turn:
-            messagebox.showwarning("Cảnh báo", "Chưa đến lượt của bạn!")
-            return
-        
-        if self.game_ended:
-            messagebox.showwarning("Cảnh báo", "Game đã kết thúc!")
-            return
-        
-        # Handle AI mode
+        """Request draw with opponent"""
         if self.is_ai_mode:
             if messagebox.askyesno("Hòa?", "Bạn muốn hòa với AI?"):
                 self.on_game_draw()
-            return
-        
-        # Confirm with user
-        if not messagebox.askyesno("Xác nhận", "Bạn có chắc muốn yêu cầu hòa?"):
-            return
-        
-        # Send request to server
-        if Client.socket_handle:
-            Client.socket_handle.write(create_message(PROTOCOL_DRAW_REQUEST))
-            messagebox.showinfo("Yêu cầu hòa", "Đã gửi yêu cầu hòa đến đối thủ!\nChờ phản hồi...")
-            
-            # Disable button temporarily to prevent spam
-            self.draw_button.config(state=tk.DISABLED)
-            
-            log(f"[DRAW] Sent draw request", "INFO")
+        else:
+            if Client.socket_handle:
+                Client.socket_handle.write(create_message(PROTOCOL_DRAW_REQUEST))
+                messagebox.showinfo("Thông báo", "Đã gửi yêu cầu hòa! Đang chờ phản hồi...")
     
     def receive_draw_request(self):
         """Receive draw request from opponent - matches Java showDrawRequest()"""
-        result = messagebox.askyesno(
-            "Yêu cầu hòa", 
-            f"{self.competitor.get_nickname()} muốn hòa.\n\nBạn đồng ý không?"
-        )
+        # Bring window to front before showing dialog
+        self.window.lift()
+        self.window.focus_force()
+        self.window.attributes('-topmost', True)
+        self.window.update()
+        self.window.attributes('-topmost', False)
         
-        if result:
-            # Accept draw
-            log(f"[DRAW] Accepted draw request", "INFO")
+        if messagebox.askyesno("Yêu cầu hòa", "Đối thủ muốn hòa. Bạn có đồng ý?", parent=self.window):
+            # Accept draw - send confirm to server
+            # Server will broadcast draw-game to both players
             if Client.socket_handle:
                 Client.socket_handle.write(create_message(PROTOCOL_DRAW_CONFIRM))
-            messagebox.showinfo("Chấp nhận", "Bạn đã chấp nhận hòa!")
+            # DON'T call on_game_draw() here - wait for server's draw-game message
         else:
             # Reject draw
-            log(f"[DRAW] Refused draw request", "INFO")
             if Client.socket_handle:
                 Client.socket_handle.write(create_message(PROTOCOL_DRAW_REFUSE))
-            messagebox.showinfo("Từ chối", "Bạn đã từ chối yêu cầu hòa!")
     
     # Alias for Client callback compatibility
     def show_draw_request(self):
@@ -641,17 +618,28 @@ class GameClientFrm:
     
     def show_draw_refuse(self):
         """Handle draw request refused by opponent"""
-        messagebox.showinfo("Từ chối hòa", f"{self.competitor.get_nickname()} đã từ chối yêu cầu hòa!")
-        
-        # Re-enable draw button when my turn comes back
-        if self.my_turn and not self.game_ended:
-            self.draw_button.config(state=tk.NORMAL)
-        
-        log(f"[DRAW] Draw request refused by opponent", "INFO")
+        messagebox.showinfo("Từ chối", "Đối thủ đã từ chối yêu cầu hòa!")
     
     def handle_draw_game(self):
-        """Handle draw game from server"""
-        self.on_game_draw()
+        """
+        Handle draw game from server
+        Server broadcasts this when both players agree to draw
+        Need to show message AND start new game
+        """
+        # End current game
+        self.game_ended = True
+        self.stop_timer()
+        self.draw_button.config(state=tk.DISABLED)
+        
+        # Bring window to front
+        self.window.lift()
+        self.window.focus_force()
+        
+        # Show draw message
+        messagebox.showinfo("Hòa", "🤝 Trò chơi hòa!", parent=self.window)
+        
+        # Start new game immediately (like Java)
+        self.new_game()
     
     def receive_draw_response(self, accepted):
         """
@@ -699,7 +687,7 @@ class GameClientFrm:
         self.add_chat_message(self.competitor.get_nickname(), message)
     
     def leave_room(self):
-        """Leave the game room - Java pattern: close all views, open new homepage"""
+        """Leave the game room"""
         # Ask for confirmation only if game is in progress
         if not self.game_ended and self.game_started:
             if not messagebox.askyesno("Xác nhận", "Rời phòng sẽ tính là thua. Bạn có chắc?"):
@@ -715,10 +703,27 @@ class GameClientFrm:
             except:
                 pass
         
-        # Close all views (including homepage if it exists) - Java pattern
-        Client.close_all_views()
+        # Close THIS game window first
+        self.close()
         
-        # Open new homepage - Java pattern
+        # Close other views EXCEPT homepage
+        # We want to reuse existing homepage, not create new one
+        views_to_close = [
+            Client.room_list_frm, Client.friend_list_frm, Client.find_room_frm,
+            Client.waiting_room_frm, Client.create_room_password_frm, 
+            Client.join_room_password_frm, Client.competitor_info_frm, 
+            Client.rank_frm, Client.game_notice_frm, Client.friend_request_frm, 
+            Client.game_ai_frm, Client.room_name_frm, Client.create_room_frm
+        ]
+        
+        for view in views_to_close:
+            if view is not None:
+                try:
+                    view.close()
+                except:
+                    pass
+        
+        # Open/show homepage (will reuse existing if available)
         Client.open_homepage()
     
     def on_closing(self):

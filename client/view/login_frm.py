@@ -25,10 +25,7 @@ class LoginFrm:
         self.window.title("Đăng nhập - Caro Game")
         self.window.geometry("400x420")
         self.window.resizable(False, False)
-        
-        # CRITICAL FIX: Bind window close event
         self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
-        
         self.setup_ui()
         
         # Center window
@@ -173,25 +170,21 @@ class LoginFrm:
         messagebox.showerror("Lỗi đăng nhập", message)
     
     def on_closing(self):
-        """Handle window close (X button) - CRITICAL FIX"""
-        if messagebox.askokcancel("Thoát", "Bạn có chắc muốn thoát ứng dụng?"):
-            # Close socket first
+        """Handle window closing - exit application"""
+        # Close socket connection
+        if Client.socket_handle:
             try:
-                if Client.socket_handle:
-                    Client.socket_handle.close()
+                Client.socket_handle.disconnect()
             except:
                 pass
-            
-            # Destroy all windows
-            try:
-                if hasattr(Client, 'root') and Client.root:
-                    Client.root.destroy()
-            except:
-                pass
-            
-            # Force exit
-            import sys
-            sys.exit(0)
+        
+        # Destroy root window and exit
+        if Client.root:
+            Client.root.quit()
+            Client.root.destroy()
+        
+        import sys
+        sys.exit(0)
     
     def show(self):
         """Show window"""

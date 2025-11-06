@@ -126,14 +126,24 @@ class SocketHandle(threading.Thread):
     
     def run(self):
         """Main message receiving loop"""
+        buffer = ""  # Buffer for incomplete messages
+        
         while self.running:
             try:
-                message = self.socket.recv(BUFFER_SIZE).decode(ENCODING).strip()
-                if not message:
+                data = self.socket.recv(BUFFER_SIZE).decode(ENCODING)
+                if not data:
                     break
                 
-                # Handle message
-                self.handle_message(message)
+                # Add to buffer
+                buffer += data
+                
+                # Process complete messages (separated by newlines)
+                while '\n' in buffer:
+                    line, buffer = buffer.split('\n', 1)
+                    line = line.strip()
+                    if line:
+                        # Handle each message separately
+                        self.handle_message(line)
             
             except socket.timeout:
                 continue
@@ -146,6 +156,7 @@ class SocketHandle(threading.Thread):
     
     def handle_message(self, message):
         """Handle incoming message from server"""
+        log(f"[RECV] {message}", "DEBUG")  # Debug log
         parts = message.split(',')
         if not parts:
             return
@@ -215,13 +226,6 @@ class SocketHandle(threading.Thread):
             
             elif command == PROTOCOL_NEW_GAME:
                 self.handle_new_game()
-            
-            # CRITICAL FIX: Add WIN/LOSE handlers
-            elif command == PROTOCOL_WIN:
-                self.handle_win()
-            
-            elif command == PROTOCOL_LOSE:
-                self.handle_lose()
             
             elif command == PROTOCOL_DRAW_REQUEST:
                 self.handle_draw_request()
@@ -402,16 +406,6 @@ class SocketHandle(threading.Thread):
         """Handle draw game"""
         if hasattr(self.client, 'on_draw_game'):
             self.client.on_draw_game()
-    
-    def handle_win(self):
-        """Handle win from server - CRITICAL FIX"""
-        if hasattr(self.client, 'on_win'):
-            self.client.on_win()
-    
-    def handle_lose(self):
-        """Handle lose from server - CRITICAL FIX"""
-        if hasattr(self.client, 'on_lose'):
-            self.client.on_lose()
     
     def handle_competitor_time_out(self):
         """Handle competitor timeout"""
